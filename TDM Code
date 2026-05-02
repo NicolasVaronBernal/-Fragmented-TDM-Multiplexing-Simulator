@@ -1,0 +1,270 @@
+!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDM por Fragmentación de Bits</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .mono {
+            font-family: 'Fira Code', monospace;
+        }
+
+        .ch-0 { color: #3b82f6; border-color: #3b82f6; }
+        .ch-1 { color: #10b981; border-color: #10b981; }
+        .ch-2 { color: #f59e0b; border-color: #f59e0b; }
+        .ch-3 { color: #ef4444; border-color: #ef4444; }
+
+        .bg-ch-0 { background-color: #eff6ff; }
+        .bg-ch-1 { background-color: #ecfdf5; }
+        .bg-ch-2 { background-color: #fffbeb; }
+        .bg-ch-3 { background-color: #fef2f2; }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">TDM por Fragmentación de Bits</h1>
+                <p class="text-slate-500 text-sm">Multiplexación síncrona con relleno de bits (Padding) automático.</p>
+            </div>
+            
+            <div class="bg-slate-50 p-2 rounded-xl border border-slate-200 flex items-center gap-3">
+                <span class="text-[10px] font-bold text-slate-400 uppercase ml-2">Dividir cada byte en:</span>
+                <div class="flex bg-white rounded-lg p-1 border border-slate-200 shadow-sm">
+                    <button onclick="setFragment(1)" id="f-1" class="frag-btn px-3 py-1 rounded text-xs font-bold transition-all">1 (8b)</button>
+                    <button onclick="setFragment(2)" id="f-2" class="frag-btn px-3 py-1 rounded text-xs font-bold transition-all">2 (4b)</button>
+                    <button onclick="setFragment(4)" id="f-4" class="frag-btn px-3 py-1 rounded text-xs font-bold transition-all">4 (2b)</button>
+                    <button onclick="setFragment(8)" id="f-8" class="frag-btn px-3 py-1 rounded text-xs font-bold transition-all">8 (1b)</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- COLUMNA 1: ENTRADAS Y VALORES COMPLETOS -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-sm font-bold mb-4 text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <span class="w-2 h-4 bg-blue-500 rounded-full"></span>
+                        1. Fuentes de Entrada (Frases)
+                    </h2>
+                    <div id="inputs-list" class="space-y-4">
+                        <!-- Dinámico -->
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-sm font-bold mb-4 text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <span class="w-2 h-4 bg-indigo-500 rounded-full"></span>
+                        2. Conversión Binaria Completa
+                    </h2>
+                    <p class="text-[10px] text-slate-400 mb-2 italic">* Se rellena con ceros a la izquierda para igualar longitudes.</p>
+                    <div id="binary-pure-list" class="space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar pr-1">
+                        <!-- Dinámico: Byte completo por canal con padding -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMNA 2: ESTRUCTURA DE TRAMAS (FRAGMENTOS) -->
+            <div class="lg:col-span-4">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-full">
+                    <h2 class="text-sm font-bold mb-4 text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <span class="w-2 h-4 bg-emerald-500 rounded-full"></span>
+                        3. Estructura de Frames (TDM)
+                    </h2>
+                    <div id="frames-viz" class="space-y-3 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
+                        <!-- Dinámico -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMNA 3: FLUJO SERIAL FINAL -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+                <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-xl flex-grow flex flex-col overflow-hidden">
+                    <h2 class="text-sm font-bold mb-4 text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                        <span class="w-2 h-4 bg-blue-400 rounded-full"></span>
+                        4. Flujo de Salida Serial
+                    </h2>
+                    <div class="bg-black/40 p-4 rounded-xl border border-slate-800 flex-grow mb-4 overflow-y-auto custom-scrollbar">
+                        <div id="total-stream" class="mono text-xs text-green-400 break-all leading-relaxed tracking-widest">
+                            <!-- Bits aquí -->
+                        </div>
+                    </div>
+                    <div id="stats" class="grid grid-cols-2 gap-4 border-t border-slate-800 pt-4 text-center">
+                        <!-- Stats -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let channels = ['Hola', 'TDM!', '123'];
+        let fragments = 2; 
+        const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        function setFragment(n) {
+            fragments = n;
+            updateUI();
+        }
+
+        function updateUI() {
+            document.querySelectorAll('.frag-btn').forEach(btn => {
+                btn.className = "px-3 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:bg-slate-100";
+            });
+            document.getElementById(`f-${fragments}`).className = "px-3 py-1 rounded text-xs font-bold transition-all bg-blue-600 text-white shadow-sm";
+            
+            renderInputs();
+            processTDM();
+        }
+
+        function renderInputs() {
+            const container = document.getElementById('inputs-list');
+            container.innerHTML = '';
+            channels.forEach((val, i) => {
+                const div = document.createElement('div');
+                div.className = `p-3 rounded-xl border-l-4 ch-${i % 4} bg-ch-${i % 4} border-opacity-50 shadow-sm`;
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[10px] font-bold opacity-60 uppercase">Canal ${labels[i]}</span>
+                    </div>
+                    <input type="text" value="${val}" oninput="updateVal(${i}, this.value)" 
+                        class="w-full bg-transparent border-b border-slate-200 focus:border-blue-400 outline-none mono text-sm py-1">
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updateVal(i, val) {
+            channels[i] = val;
+            processTDM();
+        }
+
+        function getBits(char) {
+            if (!char) return "00000000";
+            return char.charCodeAt(0).toString(2).padStart(8, '0');
+        }
+
+        function processTDM() {
+            const binaryPureList = document.getElementById('binary-pure-list');
+            const framesViz = document.getElementById('frames-viz');
+            const totalStream = document.getElementById('total-stream');
+            const stats = document.getElementById('stats');
+
+            binaryPureList.innerHTML = '';
+            framesViz.innerHTML = '';
+            let finalBits = "";
+            let bitsPerFragment = 8 / fragments;
+
+            // 1. Encontrar longitud máxima de frase
+            const maxChars = Math.max(...channels.map(c => c.length));
+            if (maxChars === 0) {
+                totalStream.innerText = "Esperando entrada...";
+                return;
+            }
+
+            // 2. Mostrar binario completo con relleno (Padding) a la izquierda (en negro)
+            channels.forEach((c, i) => {
+                const item = document.createElement('div');
+                item.className = "p-2 bg-slate-50 rounded-lg border border-slate-100";
+                
+                let bitString = "";
+                // Calculamos cuántos caracteres de padding (0s) necesitamos
+                const paddingCount = maxChars - c.length;
+                
+                // Ceros de relleno a la izquierda (bits nulos) - Ahora sin opacidad baja
+                for(let p = 0; p < paddingCount; p++) {
+                    bitString += `<span class="text-slate-600">00000000</span> `;
+                }
+
+                // Bits reales del canal
+                for(let char of c) { 
+                    bitString += `<span class="text-slate-600">${getBits(char)}</span> `; 
+                }
+
+                item.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-[10px] text-slate-400">${labels[i]} (Padding + Datos):</span>
+                    </div>
+                    <div class="mono text-[9px] break-all leading-tight text-slate-600">${bitString}</div>
+                `;
+                binaryPureList.appendChild(item);
+            });
+
+            // 3. Procesar TDM Carácter por Carácter (Sincronía)
+            for (let t = 0; t < maxChars; t++) {
+                const tHeader = document.createElement('div');
+                tHeader.className = "mt-4 mb-2 text-center py-1 bg-slate-100 rounded text-[10px] font-bold text-slate-500 uppercase tracking-widest";
+                tHeader.innerText = `Posición de Carácter ${t + 1}`;
+                framesViz.appendChild(tHeader);
+
+                for (let f = 0; f < fragments; f++) {
+                    const frameDiv = document.createElement('div');
+                    frameDiv.className = "p-3 bg-white border border-slate-100 rounded-xl shadow-sm mb-2";
+                    
+                    let frameTitle = `<div class="text-[9px] font-black text-slate-400 mb-2 uppercase tracking-tighter">Grupo Frag. ${f + 1}</div>`;
+                    let frameContent = `<div class="space-y-1.5">`;
+                    let currentFrameConcat = "";
+
+                    channels.forEach((content, chIdx) => {
+                        const paddingNeeded = maxChars - content.length;
+                        let charBits = "00000000";
+                        
+                        if (t >= paddingNeeded) {
+                            const realIndex = t - paddingNeeded;
+                            const char = content[realIndex];
+                            charBits = getBits(char);
+                        }
+                        
+                        const start = f * bitsPerFragment;
+                        const chunk = charBits.substring(start, start + bitsPerFragment);
+                        currentFrameConcat += chunk;
+
+                        frameContent += `
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] font-bold ch-${chIdx % 4}">${labels[chIdx]}${t+1}.${f+1}</span>
+                                <span class="mono text-[9px] text-slate-600 bg-slate-50 px-1 rounded">${chunk}</span>
+                            </div>
+                        `;
+                    });
+
+                    frameContent += `</div>`;
+                    frameDiv.innerHTML = frameTitle + frameContent;
+                    framesViz.appendChild(frameDiv);
+                    
+                    finalBits += currentFrameConcat;
+                }
+            }
+
+            totalStream.innerText = finalBits;
+            stats.innerHTML = `
+                <div class="bg-black/30 p-2 rounded-lg">
+                    <p class="text-[9px] text-slate-500 uppercase font-bold">Bits/Frag</p>
+                    <p class="text-sm font-bold text-white">${bitsPerFragment}</p>
+                </div>
+                <div class="bg-black/30 p-2 rounded-lg">
+                    <p class="text-[9px] text-slate-500 uppercase font-bold">Total Flujo</p>
+                    <p class="text-sm font-bold text-green-400">${finalBits.length} b</p>
+                </div>
+            `;
+        }
+
+        window.onload = () => updateUI();
+    </script>
+</body>
+</html>
